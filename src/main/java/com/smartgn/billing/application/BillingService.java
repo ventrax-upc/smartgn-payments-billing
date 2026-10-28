@@ -43,6 +43,7 @@ public class BillingService {
         f.setReadTimeout(Duration.ofSeconds(3));
         installation =
                 RestClient.builder()
+                        .requestInterceptor(new com.smartgn.billing.configuration.TraceHttp())
                         .baseUrl(url)
                         .requestFactory(f)
                         .defaultHeader("Authorization", "Bearer " + token)
@@ -115,7 +116,9 @@ public class BillingService {
                 || secret.length() < 32
                 || secret.length() > 200)
             throw error(HttpStatus.BAD_REQUEST, "Invalid idempotency key or checkout secret");
+        lock("idempotency:" + key);
         lock("checkout:" + request);
+        if (email.length() > 254) throw error(HttpStatus.BAD_REQUEST, "Email too long");
         String fp =
                 hash(
                         request
@@ -133,6 +136,9 @@ public class BillingService {
                 throw error(HttpStatus.CONFLICT, "Idempotency conflict");
             return publicOrder(old.getFirst());
         }
+        if (!db.queryForList("SELECT id FROM payment_orders WHERE installation_id=?", request)
+                .isEmpty())
+            throw error(HttpStatus.CONFLICT, "Request already has a checkout order");
         Map context;
         try {
             context =
@@ -181,6 +187,9 @@ public class BillingService {
     public Map<String, Object> subscribe(
             IdentityPort.Account actor, UUID method, boolean auto, String key) {
         UUID account = principal(actor);
+        if (key == null || key.isBlank() || key.length() > 200)
+            throw error(HttpStatus.BAD_REQUEST, "Invalid idempotency key");
+        lock("idempotency:" + key);
         lock(account.toString());
         if (db.queryForList("SELECT account_id FROM subscriptions WHERE account_id=?", account)
                 .isEmpty()) throw error(HttpStatus.CONFLICT, "Completed installation required");
@@ -189,6 +198,13 @@ public class BillingService {
                         method,
                         account)
                 .isEmpty()) throw error(HttpStatus.FORBIDDEN, "Payment method unavailable");
+        if (auto
+                && db.queryForList(
+                                "SELECT id FROM payment_methods WHERE id=? AND"
+                                        + " recurring_authorized",
+                                method)
+                        .isEmpty())
+            throw error(HttpStatus.CONFLICT, "Provider recurring consent required");
         String fp = hash(account + "|" + method + "|" + auto);
         var old = db.queryForList("SELECT * FROM payment_orders WHERE idempotency_key=?", key);
         if (!old.isEmpty()) {
@@ -200,25 +216,32 @@ public class BillingService {
             throw error(HttpStatus.CONFLICT, "Pro is already active");
         if (!db.queryForList(
                         "SELECT id FROM payment_orders WHERE account_id=? AND reason='PRO' AND"
-                            + " status IN ('PENDING','UNKNOWN')",
+                                + " status IN ('PENDING','UNKNOWN')",
                         account)
                 .isEmpty()) throw error(HttpStatus.CONFLICT, "Pro payment already pending");
         UUID id = UUID.randomUUID();
         db.update(
                 "INSERT INTO"
-                    + " payment_orders(id,account_id,reason,amount,idempotency_key,fingerprint)"
-                    + " VALUES (?,?,'PRO',?,?,?)",
+                        + " payment_orders(id,account_id,reason,amount,idempotency_key,fingerprint)"
+                        + " VALUES (?,?,'PRO',?,?,?)",
                 id,
                 account,
                 pro,
                 key,
                 fp);
         line(id, "PRO_MONTHLY", pro);
+        db.update("UPDATE payment_orders SET method_id=? WHERE id=?", method, id);
+        db.update(
+                "INSERT INTO payment_jobs(id,order_id,method_id) VALUES (?,?,?)",
+                UUID.randomUUID(),
+                id,
+                method);
         db.update(
                 "UPDATE subscriptions SET method_id=?,auto_renew=? WHERE account_id=?",
                 method,
                 auto,
                 account);
+        com.smartgn.billing.configuration.Trace.audit(db, account, "PRO_REQUESTED", id);
         return publicOrder(order(id));
     }
 
@@ -226,7 +249,7 @@ public class BillingService {
         var periods =
                 db.queryForList(
                         "SELECT starts_at,ends_at FROM subscription_periods WHERE account_id=?"
-                            + " ORDER BY ends_at DESC LIMIT 1",
+                                + " AND starts_at<=now() ORDER BY ends_at DESC LIMIT 1",
                         account);
         boolean active = false;
         Object end = null;
@@ -244,11 +267,24 @@ public class BillingService {
         m.put("proActive", active);
         m.put("plan", active ? "PRO" : "FREE");
         m.put("periodEndsAt", end);
+        m.put("periodStartsAt", periods.isEmpty() ? null : periods.getFirst().get("starts_at"));
+        var subscription =
+                db.queryForList("SELECT auto_renew FROM subscriptions WHERE account_id=?", account);
+        m.put("installationCompleted", !subscription.isEmpty());
+        m.put(
+                "autoRenew",
+                !subscription.isEmpty()
+                        && Boolean.TRUE.equals(subscription.getFirst().get("auto_renew")));
+        m.put("technicalCoveragePercent", active ? 100 : 0);
+        m.put("monthlyProPrice", pro);
+        m.put("currency", "PEN");
         return m;
     }
 
     @Transactional
     public Map<String, Object> confirm(UUID id, String reference) {
+        var initial = order(id);
+        if ("PRO".equals(initial.get("reason"))) lock(initial.get("account_id").toString());
         lock(id.toString());
         var o = order(id);
         var result = gateway.verify(reference, id, (BigDecimal) o.get("amount"));
@@ -265,7 +301,7 @@ public class BillingService {
         if (existing.isEmpty())
             db.update(
                     "INSERT INTO payment_transactions(id,order_id,provider_reference,status,amount)"
-                        + " VALUES (?,?,?,?,?)",
+                            + " VALUES (?,?,?,?,?)",
                     UUID.randomUUID(),
                     id,
                     reference,
@@ -281,7 +317,9 @@ public class BillingService {
                 result.status(),
                 id);
         if (result.status().equals("CONFIRMED")) {
-            Instant now = Instant.now();
+            Instant now = result.confirmedAt() == null ? Instant.now() : result.confirmedAt();
+            if (now.isAfter(Instant.now().plusSeconds(60)))
+                throw error(HttpStatus.CONFLICT, "Provider confirmation date is invalid");
             db.update(
                     "UPDATE payment_orders SET confirmed_at=? WHERE id=?",
                     java.sql.Timestamp.from(now),
@@ -289,6 +327,21 @@ public class BillingService {
             if ("PRO".equals(o.get("reason"))) {
                 UUID account = (UUID) o.get("account_id");
                 lock(account.toString());
+                var paid =
+                        db.queryForList(
+                                "SELECT ends_at FROM subscription_periods WHERE account_id=? ORDER"
+                                        + " BY ends_at DESC LIMIT 1",
+                                account);
+                if (!paid.isEmpty()) {
+                    Instant paidEnd =
+                            ((java.sql.Timestamp) paid.getFirst().get("ends_at")).toInstant();
+                    if (now.isBefore(paidEnd)) now = paidEnd;
+                }
+                if (o.get("requested_period_start") != null) {
+                    Instant expected =
+                            ((java.sql.Timestamp) o.get("requested_period_start")).toInstant();
+                    if (now.isBefore(expected)) now = expected;
+                }
                 db.update(
                         "INSERT INTO subscription_periods VALUES (?,?,?,?,?)",
                         UUID.randomUUID(),
@@ -297,10 +350,24 @@ public class BillingService {
                         java.sql.Timestamp.from(now),
                         java.sql.Timestamp.from(BillingPolicy.monthEnd(now)));
             }
-            event("PaymentConfirmed", id, "{}");
+            var payload = new java.util.LinkedHashMap<String, Object>();
+            payload.put("purchaseOrderId", id);
+            payload.put("accountId", o.get("account_id"));
+            payload.put("installationId", o.get("installation_id"));
+            payload.put("reason", o.get("reason"));
+            payload.put("previousStatus", o.get("status"));
+            payload.put("status", "CONFIRMED");
+            payload.put("amount", o.get("amount"));
+            payload.put("currency", "PEN");
+            payload.put("confirmedAt", now.toString());
+            payload.put("testMode", result.testMode());
+            event(
+                    "PaymentConfirmed",
+                    id,
+                    new tools.jackson.databind.ObjectMapper().writeValueAsString(payload));
             db.update(
                     "INSERT INTO billing_documents(id,order_id,series,number) VALUES"
-                        + " (?,?,'B001',nextval('fiscal_number'))",
+                            + " (?,?,'B001',nextval('fiscal_number'))",
                     UUID.randomUUID(),
                     id);
         }
@@ -308,33 +375,30 @@ public class BillingService {
     }
 
     private void event(String type, UUID aggregate, String payload) {
-        db.update(
-                "INSERT INTO billing_audit VALUES (?,?,?, ?,now())",
-                UUID.randomUUID(),
-                null,
-                type,
-                aggregate);
+        com.smartgn.billing.configuration.Trace.audit(db, null, type, aggregate, payload);
         db.update(
                 "INSERT INTO outbox(id,event_type,aggregate_id,payload,correlation_id) VALUES"
-                    + " (?,?,?,?,?)",
+                        + " (?,?,?,?,?)",
                 UUID.randomUUID(),
                 type,
                 aggregate,
                 payload,
-                UUID.randomUUID());
+                com.smartgn.billing.configuration.Trace.correlation());
     }
 
     @Transactional
     public void installed(UUID event, UUID account, Instant at, String fingerprint) {
+        if (at == null || at.isAfter(Instant.now().plusSeconds(5)))
+            throw error(HttpStatus.BAD_REQUEST, "Invalid installation date");
         if (!receipt(event, fingerprint)) return;
         if (db.queryForList(
                         "SELECT id FROM payment_orders WHERE account_id=? AND reason='INITIAL' AND"
-                            + " status='CONFIRMED'",
+                                + " status='CONFIRMED'",
                         account)
                 .isEmpty()) throw error(HttpStatus.CONFLICT, "Verified purchase required");
         db.update(
                 "INSERT INTO subscriptions(account_id,installed_at) VALUES (?,?) ON"
-                    + " CONFLICT(account_id) DO NOTHING",
+                        + " CONFLICT(account_id) DO NOTHING",
                 account,
                 java.sql.Timestamp.from(at));
     }
@@ -362,13 +426,20 @@ public class BillingService {
         String fp = hash(visit + "|" + account + "|" + meter + "|" + at + "|" + cost);
         if (!receipt(event, fp)) return;
         lock(visit.toString());
-        if (!db.queryForList("SELECT visit_id FROM coverage_decisions WHERE visit_id=?", visit)
-                .isEmpty()) throw error(HttpStatus.CONFLICT, "Visit already billed");
+        var previous = db.queryForList("SELECT * FROM coverage_decisions WHERE visit_id=?", visit);
+        if (!previous.isEmpty()) {
+            var p = previous.getFirst();
+            if (account.equals(p.get("account_id"))
+                    && meter.equals(p.get("meter_id"))
+                    && cost.compareTo((BigDecimal) p.get("cost")) == 0
+                    && at.equals(((java.sql.Timestamp) p.get("completed_at")).toInstant())) return;
+            throw error(HttpStatus.CONFLICT, "Visit already billed with different data");
+        }
         boolean covered =
                 Boolean.TRUE.equals(
                         db.queryForObject(
                                 "SELECT EXISTS(SELECT 1 FROM subscription_periods WHERE"
-                                    + " account_id=? AND starts_at<=? AND ends_at>?)",
+                                        + " account_id=? AND starts_at<=? AND ends_at>?)",
                                 Boolean.class,
                                 account,
                                 java.sql.Timestamp.from(at),
@@ -397,28 +468,78 @@ public class BillingService {
                 covered,
                 covered ? BigDecimal.ZERO : cost,
                 order);
-        event("CoverageCalculated", visit, "{\"covered\":" + covered + "}");
+        var details = new LinkedHashMap<String, Object>();
+        details.put("visitId", visit);
+        details.put("accountId", account);
+        details.put("covered", covered);
+        details.put("cost", cost);
+        details.put("balance", covered ? BigDecimal.ZERO : cost);
+        details.put("orderId", order);
+        event(
+                "CoverageCalculated",
+                visit,
+                new tools.jackson.databind.ObjectMapper().writeValueAsString(details));
     }
 
     public List<Map<String, Object>> history(IdentityPort.Account actor, int offset, int limit) {
+        return history(actor, offset, limit, null, null);
+    }
+
+    public List<Map<String, Object>> history(
+            IdentityPort.Account actor, int offset, int limit, String reason, String status) {
         UUID account = principal(actor);
+        if (reason != null && !Set.of("INITIAL", "PRO", "TECHNICAL").contains(reason))
+            throw error(HttpStatus.BAD_REQUEST, "Invalid reason");
+        if (status != null
+                && !Set.of("PENDING", "UNKNOWN", "DECLINED", "CONFIRMED").contains(status))
+            throw error(HttpStatus.BAD_REQUEST, "Invalid status");
         if (offset < 0 || limit < 1 || limit > 100)
             throw error(HttpStatus.BAD_REQUEST, "Invalid pagination");
-        return db.queryForList(
-                "SELECT id,reason,amount,currency,status,created_at,confirmed_at FROM"
-                    + " payment_orders WHERE account_id=? ORDER BY created_at DESC,id LIMIT ?"
-                    + " OFFSET ?",
-                account,
-                limit,
-                offset);
+        var orders =
+                db.queryForList(
+                        "SELECT id,reason,amount,currency,status,created_at,confirmed_at FROM"
+                            + " payment_orders WHERE account_id=? AND (?::text IS NULL OR reason=?)"
+                            + " AND (?::text IS NULL OR status=?) ORDER BY created_at DESC,id LIMIT"
+                            + " ? OFFSET ?",
+                        account,
+                        reason,
+                        reason,
+                        status,
+                        status,
+                        limit,
+                        offset);
+        for (var row : orders) {
+            UUID id = (UUID) row.get("id");
+            row.put(
+                    "lines",
+                    db.queryForList(
+                            "SELECT concept,amount FROM order_lines WHERE order_id=? ORDER BY"
+                                    + " concept",
+                            id));
+            row.put(
+                    "attempts",
+                    db.queryForList(
+                            "SELECT provider_reference,status,amount,occurred_at FROM"
+                                    + " payment_transactions WHERE order_id=? ORDER BY occurred_at",
+                            id));
+            row.put(
+                    "documents",
+                    db.queryForList(
+                            "SELECT id,series,number,fiscal_status,test_mode FROM billing_documents"
+                                    + " WHERE order_id=?",
+                            id));
+        }
+        return orders;
     }
 
     public Map<String, Object> document(IdentityPort.Account actor, UUID id) {
         UUID account = principal(actor);
         return db
                 .queryForList(
-                        "SELECT d.* FROM billing_documents d JOIN payment_orders o ON"
-                            + " o.id=d.order_id WHERE d.id=? AND o.account_id=?",
+                        "SELECT"
+                            + " d.id,d.order_id,d.series,d.number,d.fiscal_status,d.issued_at,d.test_mode,d.response"
+                            + " FROM billing_documents d JOIN payment_orders o ON o.id=d.order_id"
+                            + " WHERE d.id=? AND o.account_id=?",
                         id,
                         account)
                 .stream()

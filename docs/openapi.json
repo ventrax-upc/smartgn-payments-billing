@@ -1,13 +1,13 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "OpenAPI definition",
-    "version": "v0",
-    "description": "Incremental local baseline. Fiscal transmission and broker publication are not implemented."
+    "title": "SmartGN Payments and Billing",
+    "description": "Sprint 2 payments, subscriptions, coverage and electronic invoicing. Local provider fixtures are explicitly test doubles; fiscal beta results have no production validity.",
+    "version": "0.1.0"
   },
   "servers": [
     {
-      "url": "http://localhost:8083",
+      "url": "http://localhost:28083",
       "description": "Generated server url"
     }
   ],
@@ -17,6 +17,7 @@
         "tags": [
           "card-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "primary",
         "parameters": [
           {
@@ -33,7 +34,12 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/internal/v1/technical-visits/completions": {
@@ -41,6 +47,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Internal service credential required. Exclude from public gateway routes.",
         "operationId": "visit",
         "requestBody": {
           "content": {
@@ -56,7 +63,12 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ]
       }
     },
     "/internal/v1/payments/confirmations": {
@@ -64,6 +76,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Internal service credential required. Exclude from public gateway routes.",
         "operationId": "confirmation",
         "requestBody": {
           "content": {
@@ -86,7 +99,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ]
       }
     },
     "/internal/v1/local-provider/results": {
@@ -94,6 +112,7 @@
         "tags": [
           "local-fixture-controller"
         ],
+        "description": "Internal service credential required. Exclude from public gateway routes.",
         "operationId": "result",
         "requestBody": {
           "content": {
@@ -109,7 +128,41 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ]
+      }
+    },
+    "/internal/v1/local-provider/cards": {
+      "post": {
+        "tags": [
+          "local-fixture-controller"
+        ],
+        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "operationId": "card",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardFixture"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ]
       }
     },
     "/internal/v1/events": {
@@ -117,6 +170,7 @@
         "tags": [
           "event-controller"
         ],
+        "description": "Internal service credential required. Exclude from public gateway routes.",
         "operationId": "receive",
         "requestBody": {
           "content": {
@@ -133,7 +187,12 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ]
       }
     },
     "/api/v1/subscriptions/pro": {
@@ -141,6 +200,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "pro",
         "parameters": [
           {
@@ -173,7 +233,114 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payments/orders/{id}/retry": {
+      "post": {
+        "tags": [
+          "subscription-controller"
+        ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "operationId": "retry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pay"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payments/orders/{id}/pay": {
+      "post": {
+        "tags": [
+          "subscription-controller"
+        ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "operationId": "pay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pay"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/payment-methods": {
@@ -181,6 +348,7 @@
         "tags": [
           "card-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "list",
         "responses": {
           "200": {
@@ -193,12 +361,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
           "card-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "add",
         "requestBody": {
           "content": {
@@ -221,7 +395,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/checkout/orders": {
@@ -229,6 +408,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Anonymous checkout; subsequent order access requires the private X-Checkout-Secret.",
         "operationId": "checkout",
         "parameters": [
           {
@@ -273,7 +453,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/checkout/orders/{id}/sessions": {
@@ -281,6 +462,7 @@
         "tags": [
           "session-controller"
         ],
+        "description": "Anonymous checkout; subsequent order access requires the private X-Checkout-Secret.",
         "operationId": "session",
         "parameters": [
           {
@@ -312,7 +494,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/subscriptions/me/renewal": {
@@ -320,6 +503,7 @@
         "tags": [
           "subscription-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "renewal",
         "requestBody": {
           "content": {
@@ -335,7 +519,12 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/internal/v1/accounts/{id}/entitlements": {
@@ -343,6 +532,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Internal service credential required. Exclude from public gateway routes.",
         "operationId": "entitlement",
         "parameters": [
           {
@@ -366,7 +556,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ]
       }
     },
     "/api/v1/technical-statements/{id}": {
@@ -374,6 +569,7 @@
         "tags": [
           "subscription-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "statement",
         "parameters": [
           {
@@ -397,7 +593,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/subscriptions/me": {
@@ -405,6 +606,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "plan",
         "responses": {
           "200": {
@@ -417,7 +619,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/payments/orders/{id}": {
@@ -425,6 +632,7 @@
         "tags": [
           "subscription-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "order",
         "parameters": [
           {
@@ -448,7 +656,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/payments/history": {
@@ -456,6 +669,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "history",
         "parameters": [
           {
@@ -477,6 +691,22 @@
               "format": "int32",
               "default": 50
             }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -490,7 +720,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/checkout/orders/{id}": {
@@ -498,6 +733,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Anonymous checkout; subsequent order access requires the private X-Checkout-Secret.",
         "operationId": "order_1",
         "parameters": [
           {
@@ -529,7 +765,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/billing-documents/{id}": {
@@ -537,6 +774,7 @@
         "tags": [
           "billing-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "document",
         "parameters": [
           {
@@ -560,7 +798,59 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing-documents/{id}/download": {
+      "get": {
+        "tags": [
+          "fiscal-controller"
+        ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "operationId": "download",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pdf"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/payment-methods/{id}": {
@@ -568,6 +858,7 @@
         "tags": [
           "card-controller"
         ],
+        "description": "Current IAM session, principal account and ownership are checked by Billing.",
         "operationId": "delete",
         "parameters": [
           {
@@ -584,7 +875,12 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     }
   },
@@ -671,6 +967,44 @@
           "status"
         ]
       },
+      "CardFixture": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "providerToken": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "test_[a-zA-Z0-9_-]{16,160}"
+          },
+          "brand": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          },
+          "lastFour": {
+            "type": "string",
+            "pattern": "[0-9]{4}"
+          },
+          "recurringAuthorized": {
+            "type": "boolean"
+          },
+          "nextStatus": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "CONFIRMED|DECLINED|UNKNOWN"
+          }
+        },
+        "required": [
+          "accountId",
+          "brand",
+          "lastFour",
+          "nextStatus",
+          "providerToken"
+        ]
+      },
       "Pro": {
         "type": "object",
         "properties": {
@@ -686,12 +1020,25 @@
           "paymentMethodId"
         ]
       },
+      "Pay": {
+        "type": "object",
+        "properties": {
+          "paymentMethodId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "paymentMethodId"
+        ]
+      },
       "Card": {
         "type": "object",
         "properties": {
           "providerToken": {
             "type": "string",
-            "pattern": "test_[a-zA-Z0-9_-]{16,160}"
+            "maxLength": 255,
+            "minLength": 0
           },
           "brand": {
             "type": "string",
@@ -704,8 +1051,6 @@
           }
         },
         "required": [
-          "brand",
-          "lastFour",
           "providerToken"
         ]
       },
@@ -746,6 +1091,18 @@
             "type": "boolean"
           }
         }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "serviceAuth": {
+        "type": "http",
+        "description": "Independent internal service credential",
+        "scheme": "bearer"
       }
     }
   }

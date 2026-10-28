@@ -1,0 +1,12 @@
+ALTER TABLE payment_orders ADD COLUMN method_id UUID REFERENCES payment_methods(id), ADD COLUMN requested_period_start TIMESTAMPTZ;
+ALTER TABLE subscriptions ADD COLUMN recurring_authorized_at TIMESTAMPTZ;
+ALTER TABLE payment_methods ADD COLUMN recurring_authorized BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE outbox ADD COLUMN mqtt_published_at TIMESTAMPTZ, ADD COLUMN lease_id UUID, ADD COLUMN lease_until TIMESTAMPTZ, ADD COLUMN mqtt_available_at TIMESTAMPTZ NOT NULL DEFAULT now(), ADD COLUMN mqtt_lease_id UUID, ADD COLUMN mqtt_lease_until TIMESTAMPTZ;
+ALTER TABLE billing_documents ADD COLUMN issued_at TIMESTAMPTZ, ADD COLUMN pdf BYTEA, ADD COLUMN cdr BYTEA, ADD COLUMN summary_id UUID, ADD COLUMN test_mode BOOLEAN NOT NULL DEFAULT true;
+CREATE TABLE fiscal_summaries(id UUID PRIMARY KEY, document_id UUID UNIQUE NOT NULL REFERENCES billing_documents(id), name VARCHAR(100) UNIQUE NOT NULL, xml TEXT NOT NULL, ticket VARCHAR(100), status VARCHAR(30) NOT NULL, available_at TIMESTAMPTZ NOT NULL DEFAULT now(), lease_id UUID, lease_until TIMESTAMPTZ, attempts INT NOT NULL DEFAULT 0, response VARCHAR(2000), cdr BYTEA);
+CREATE TABLE payment_jobs(id UUID PRIMARY KEY, order_id UUID UNIQUE NOT NULL REFERENCES payment_orders(id), method_id UUID NOT NULL REFERENCES payment_methods(id), status VARCHAR(30) NOT NULL DEFAULT 'PENDING', provider_reference VARCHAR(200), available_at TIMESTAMPTZ NOT NULL DEFAULT now(), lease_id UUID, lease_until TIMESTAMPTZ, attempts INT NOT NULL DEFAULT 0);
+CREATE TABLE local_provider_results(reference VARCHAR(200) PRIMARY KEY, order_id UUID NOT NULL, status VARCHAR(30) NOT NULL CHECK(status IN ('CONFIRMED','DECLINED','UNKNOWN')), amount NUMERIC(12,2) NOT NULL CHECK(amount>0), confirmed_at TIMESTAMPTZ);
+CREATE TABLE local_provider_cards(token_hash VARCHAR(64) PRIMARY KEY, account_id UUID NOT NULL, brand VARCHAR(30) NOT NULL, last_four VARCHAR(4) NOT NULL, recurring_authorized BOOLEAN NOT NULL, next_status VARCHAR(30) NOT NULL DEFAULT 'CONFIRMED' CHECK(next_status IN ('CONFIRMED','DECLINED','UNKNOWN')));
+CREATE INDEX payment_jobs_due ON payment_jobs(available_at) WHERE status IN ('PENDING','UNKNOWN');
+CREATE INDEX outbox_mqtt_due ON outbox(mqtt_available_at) WHERE mqtt_published_at IS NULL;
+CREATE TABLE mqtt_inbox_errors(event_id UUID PRIMARY KEY, event_type VARCHAR(80), reason VARCHAR(100) NOT NULL, occurred_at TIMESTAMPTZ NOT NULL DEFAULT now());

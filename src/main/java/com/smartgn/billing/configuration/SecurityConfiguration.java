@@ -88,6 +88,12 @@ public class SecurityConfiguration {
                                         if (claims.getAudience() == null
                                                 || !claims.getAudience().contains("smartgn-api")
                                                 || claims.getExpiration() == null
+                                                || claims.getIssuedAt() == null
+                                                || claims.getIssuedAt()
+                                                        .toInstant()
+                                                        .isAfter(
+                                                                java.time.Instant.now()
+                                                                        .plusSeconds(60))
                                                 || !Objects.equals(
                                                         claims.getSubject(),
                                                         claims.get("accountId", String.class))) {
@@ -99,7 +105,9 @@ public class SecurityConfiguration {
                                                 || !a.accountId()
                                                         .toString()
                                                         .equals(claims.getSubject())
-                                                || !a.status().equals("ACTIVE")) {
+                                                || !a.status().equals("ACTIVE")
+                                                || !a.role()
+                                                        .equals(claims.get("role", String.class))) {
                                             res.sendError(401);
                                             return;
                                         }

@@ -29,6 +29,6 @@ public class SessionController {
                 "LOCAL_TEST_DOUBLE",
                 "instructions",
                 "Register a controlled result through the authenticated internal fixture then"
-                    + " submit its provider reference for verification");
+                        + " submit its provider reference for verification");
     }
 }

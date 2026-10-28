@@ -16,9 +16,10 @@ public class OpenApiConfiguration {
                                 .title("SmartGN Payments and Billing")
                                 .version("0.1.0")
                                 .description(
-                                        "Incremental local baseline. Local provider fixtures are"
-                                            + " test doubles; pending fiscal records are not issued"
-                                            + " SUNAT documents."))
+                                        "Sprint 2 payments, subscriptions, coverage and electronic"
+                                            + " invoicing. Local provider fixtures are explicitly"
+                                            + " test doubles; fiscal beta results have no"
+                                            + " production validity."))
                 .components(
                         new Components()
                                 .addSecuritySchemes(
@@ -34,6 +35,64 @@ public class OpenApiConfiguration {
                                                 .scheme("bearer")
                                                 .description(
                                                         "Independent internal service"
-                                                            + " credential")));
+                                                                + " credential")));
+    }
+
+    @Bean
+    org.springdoc.core.customizers.OpenApiCustomizer securityContracts() {
+        return api -> {
+            if (api.getPaths() != null)
+                api.getPaths()
+                        .forEach(
+                                (path, item) ->
+                                        item.readOperations()
+                                                .forEach(
+                                                        op -> {
+                                                            if (path.startsWith("/internal/"))
+                                                                op.setSecurity(
+                                                                        java.util.List.of(
+                                                                                new SecurityRequirement()
+                                                                                        .addList(
+                                                                                                "serviceAuth")));
+                                                            else if (!path.startsWith(
+                                                                    "/api/v1/checkout/"))
+                                                                op.setSecurity(
+                                                                        java.util.List.of(
+                                                                                new SecurityRequirement()
+                                                                                        .addList(
+                                                                                                "bearerAuth")));
+                                                            else
+                                                                op.setSecurity(java.util.List.of());
+                                                            if (op.getDescription() == null)
+                                                                op.setDescription(
+                                                                        path.startsWith(
+                                                                                        "/internal/")
+                                                                                ? "Internal service"
+                                                                                      + " credential"
+                                                                                      + " required."
+                                                                                      + " Exclude"
+                                                                                      + " from"
+                                                                                      + " public"
+                                                                                      + " gateway"
+                                                                                      + " routes."
+                                                                                : path.startsWith(
+                                                                                                "/api/v1/checkout/")
+                                                                                        ? "Anonymous"
+                                                                                              + " checkout;"
+                                                                                              + " subsequent"
+                                                                                              + " order"
+                                                                                              + " access"
+                                                                                              + " requires"
+                                                                                              + " the private"
+                                                                                              + " X-Checkout-Secret."
+                                                                                        : "Current"
+                                                                                              + " IAM session,"
+                                                                                              + " principal"
+                                                                                              + " account"
+                                                                                              + " and ownership"
+                                                                                              + " are checked"
+                                                                                              + " by Billing.");
+                                                        }));
+        };
     }
 }

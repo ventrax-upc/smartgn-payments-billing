@@ -33,3 +33,22 @@ smartgn:
   pro-price: ${PRO_PRICE:35.00}
   technical-base-price: ${TECHNICAL_BASE_PRICE:20.00}
   allowed-origin: ${ALLOWED_ORIGIN:http://localhost:4200}
+
+  card-key: ${CARD_ENCRYPTION_KEY}
+  mqtt:
+    url: ${MQTT_URL:}
+    user: ${MQTT_USERNAME:billing-service}
+    password: ${MQTT_PASSWORD:}
+    client-id: ${MQTT_CLIENT_ID:smartgn-billing}
+  tax:
+    mode: ${SUNAT_MODE:disabled}
+    ruc: ${FISCAL_RUC:}
+    name: ${FISCAL_NAME:}
+    address: ${FISCAL_ADDRESS:}
+    ubigeo: ${FISCAL_UBIGEO:150101}
+    key-path: ${TAX_KEYSTORE_PATH:}
+    key-password: ${TAX_KEY_PASSWORD:}
+    rate: ${TAX_RATE:0.18}
+    endpoint: ${SUNAT_ENDPOINT:https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService}
+    user: ${SUNAT_USER:}
+    password: ${SUNAT_PASSWORD:}

@@ -17,4 +17,16 @@ public class UnavailablePaymentGateway implements PaymentGateway {
         throw new ResponseStatusException(
                 HttpStatus.SERVICE_UNAVAILABLE, "Niubiz merchant integration is not configured");
     }
+
+    public CardProof card(String token, UUID account) {
+        throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE, "Niubiz tokenization is not configured");
+    }
+
+    public Result charge(
+            UUID operation, UUID order, BigDecimal amount, String token, boolean recurring) {
+        throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Niubiz merchant debit integration is not configured");
+    }
 }

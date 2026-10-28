@@ -25,6 +25,7 @@ public class IdentityAdapter implements IdentityPort {
         f.setReadTimeout(java.time.Duration.ofSeconds(3));
         http =
                 RestClient.builder()
+                        .requestInterceptor(new com.smartgn.billing.configuration.TraceHttp())
                         .baseUrl(url)
                         .requestFactory(f)
                         .defaultHeader("Authorization", "Bearer " + token)

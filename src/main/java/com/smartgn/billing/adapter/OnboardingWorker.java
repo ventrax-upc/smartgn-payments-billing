@@ -27,6 +27,7 @@ public class OnboardingWorker {
         f.setReadTimeout(java.time.Duration.ofSeconds(3));
         iam =
                 RestClient.builder()
+                        .requestInterceptor(new com.smartgn.billing.configuration.TraceHttp())
                         .baseUrl(iamUrl)
                         .requestFactory(f)
                         .defaultHeader("Authorization", "Bearer " + token)
@@ -36,15 +37,28 @@ public class OnboardingWorker {
 
     @Scheduled(fixedDelay = 3000)
     public void send() {
-        var jobs =
+        UUID claim = UUID.randomUUID();
+        var claimed =
                 db.queryForList(
-                        "SELECT x.id AS event_id,o.* FROM outbox x JOIN payment_orders o ON"
+                        "UPDATE outbox SET lease_id=?,lease_until=now()+interval '30 seconds' WHERE"
+                            + " id=(SELECT x.id FROM outbox x JOIN payment_orders o ON"
                             + " o.id=x.aggregate_id WHERE x.event_type='PaymentConfirmed' AND"
                             + " o.reason='INITIAL' AND x.delivered_at IS NULL AND"
-                            + " x.available_at<=now() ORDER BY x.created_at LIMIT 10");
+                            + " x.available_at<=now() AND (x.lease_until IS NULL OR"
+                            + " x.lease_until<now()) ORDER BY x.created_at LIMIT 1 FOR UPDATE OF x"
+                            + " SKIP LOCKED) RETURNING id",
+                        claim);
+        var jobs = new java.util.ArrayList<java.util.Map<String, Object>>();
+        for (var c : claimed)
+            jobs.addAll(
+                    db.queryForList(
+                            "SELECT x.id AS event_id,x.correlation_id,o.* FROM outbox x JOIN"
+                                    + " payment_orders o ON o.id=x.aggregate_id WHERE x.id=?",
+                            c.get("id")));
         for (var j : jobs)
             try {
                 UUID event = (UUID) j.get("event_id"), order = (UUID) j.get("id");
+                org.slf4j.MDC.put("correlationId", j.get("correlation_id").toString());
                 UUID account = (UUID) j.get("account_id");
                 if (account == null) {
                     var result =
@@ -70,7 +84,7 @@ public class OnboardingWorker {
                     account = UUID.fromString(result.get("accountId").toString());
                     db.update(
                             "UPDATE payment_orders SET account_id=? WHERE id=? AND account_id IS"
-                                + " NULL",
+                                    + " NULL",
                             account,
                             order);
                 }
@@ -93,14 +107,17 @@ public class OnboardingWorker {
                         .retrieve()
                         .toBodilessEntity();
                 db.update(
-                        "UPDATE outbox SET delivered_at=now(),installation_delivered=true WHERE"
-                            + " id=?",
+                        "UPDATE outbox SET"
+                                + " delivered_at=now(),installation_delivered=true,lease_until=NULL"
+                                + " WHERE id=?",
                         event);
             } catch (Exception e) {
                 db.update(
                         "UPDATE outbox SET attempts=attempts+1,available_at=now()+interval '30"
-                            + " seconds' WHERE id=?",
+                                + " seconds',lease_until=NULL WHERE id=?",
                         j.get("event_id"));
+            } finally {
+                org.slf4j.MDC.remove("correlationId");
             }
     }
 }

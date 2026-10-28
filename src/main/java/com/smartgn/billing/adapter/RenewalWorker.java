@@ -28,15 +28,16 @@ public class RenewalWorker {
                 db.queryForList(
                         "SELECT s.account_id,max(p.ends_at) AS due FROM subscriptions s JOIN"
                             + " subscription_periods p USING(account_id) JOIN payment_methods m ON"
-                            + " m.id=s.method_id AND m.active WHERE s.auto_renew GROUP BY"
-                            + " s.account_id HAVING max(p.ends_at)<=now()");
+                            + " m.id=s.method_id AND m.active WHERE s.auto_renew AND"
+                            + " m.recurring_authorized GROUP BY s.account_id HAVING"
+                            + " max(p.ends_at)<=now()");
         for (var row : rows) {
             UUID a = (UUID) row.get("account_id");
             db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", a.toString());
             String key = "renewal:" + a + ":" + row.get("due");
             if (!db.queryForList(
                             "SELECT id FROM payment_orders WHERE idempotency_key=? OR (account_id=?"
-                                + " AND reason='PRO' AND status IN ('PENDING','UNKNOWN'))",
+                                    + " AND reason='PRO' AND status IN ('PENDING','UNKNOWN'))",
                             key,
                             a)
                     .isEmpty()) continue;
@@ -50,6 +51,18 @@ public class RenewalWorker {
                     price,
                     key,
                     BillingService.hash(key));
+            db.update(
+                    "UPDATE payment_orders SET method_id=(SELECT method_id FROM subscriptions WHERE"
+                            + " account_id=?),requested_period_start=? WHERE id=?",
+                    a,
+                    row.get("due"),
+                    id);
+            db.update(
+                    "INSERT INTO payment_jobs(id,order_id,method_id) SELECT ?,?,method_id FROM"
+                            + " subscriptions WHERE account_id=?",
+                    UUID.randomUUID(),
+                    id,
+                    a);
             db.update(
                     "INSERT INTO order_lines VALUES (?,?,'PRO_MONTHLY',?)",
                     UUID.randomUUID(),

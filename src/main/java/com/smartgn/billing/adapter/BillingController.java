@@ -15,8 +15,14 @@ import java.util.*;
 public class BillingController {
     private final BillingService service;
 
-    public BillingController(BillingService service) {
+    private final BigDecimal technicalBase;
+
+    public BillingController(
+            BillingService service,
+            @org.springframework.beans.factory.annotation.Value("${smartgn.technical-base-price}")
+                    BigDecimal technicalBase) {
         this.service = service;
+        this.technicalBase = com.smartgn.billing.domain.BillingPolicy.money(technicalBase);
     }
 
     public record Checkout(
@@ -62,7 +68,9 @@ public class BillingController {
 
     @GetMapping("/api/v1/subscriptions/me")
     public Object plan(@RequestAttribute("actor") IdentityPort.Account actor) {
-        return service.entitlement(service.principal(actor));
+        var result = service.entitlement(service.principal(actor));
+        result.put("technicalBasePriceReference", technicalBase);
+        return result;
     }
 
     @GetMapping("/internal/v1/accounts/{id}/entitlements")
@@ -85,8 +93,10 @@ public class BillingController {
     public Object history(
             @RequestAttribute("actor") IdentityPort.Account actor,
             @RequestParam(defaultValue = "0") int offset,
-            @RequestParam(defaultValue = "50") int limit) {
-        return service.history(actor, offset, limit);
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) String reason,
+            @RequestParam(required = false) String status) {
+        return service.history(actor, offset, limit, reason, status);
     }
 
     @GetMapping("/api/v1/billing-documents/{id}")
