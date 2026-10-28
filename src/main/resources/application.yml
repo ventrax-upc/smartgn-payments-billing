@@ -1,0 +1,35 @@
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  application:
+    name: smartgn-payments-billing
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/billing_db}
+    username: ${DB_USERNAME:smartgn_billing}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-init-sql: SET search_path TO billing
+  flyway:
+    schemas: billing
+    default-schema: billing
+    create-schemas: true
+server:
+  port: ${PORT:8083}
+  error:
+    include-message: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+smartgn:
+  internal-token: ${INTERNAL_SERVICE_TOKEN}
+  iam-url: ${IAM_BASE_URL:http://localhost:8080}
+  installation-url: ${INSTALLATION_BASE_URL:http://localhost:8081}
+  jwt-secret: ${JWT_SECRET}
+  device-price: ${DEVICE_PRICE:200.00}
+  installation-price: ${INSTALLATION_PRICE:50.00}
+  pro-price: ${PRO_PRICE:35.00}
+  technical-base-price: ${TECHNICAL_BASE_PRICE:20.00}
+  allowed-origin: ${ALLOWED_ORIGIN:http://localhost:4200}
