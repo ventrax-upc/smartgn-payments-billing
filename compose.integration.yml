@@ -1,0 +1,81 @@
+name: smartgn-billing-integration
+services:
+  db:
+    image: postgres:17.6
+    environment: {POSTGRES_DB: billing_db, POSTGRES_USER: smartgn_billing, POSTGRES_PASSWORD: '${DB_PASSWORD}'}
+    volumes: [billing-integration-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, 'pg_isready -U smartgn_billing -d billing_db'], interval: 2s, timeout: 2s, retries: 30}
+  broker:
+    extends: {file: compose.yml, service: broker}
+    ports: !override ["127.0.0.1:1885:1883"]
+  billing:
+    extends: {file: compose.yml, service: billing}
+    ports: !override ["127.0.0.1:28083:8083"]
+    environment:
+      IAM_BASE_URL: http://iam:8080
+      INSTALLATION_BASE_URL: http://installation:8081
+      MQTT_CLIENT_ID: smartgn-billing-integration
+    depends_on:
+      db: {condition: service_healthy}
+  iam-db:
+    image: postgres:18
+    environment: {POSTGRES_DB: iam_db, POSTGRES_USER: smartgn_iam, POSTGRES_PASSWORD: '${DB_PASSWORD}'}
+    volumes: [iam-integration-data:/var/lib/postgresql]
+    healthcheck: {test: [CMD-SHELL, 'pg_isready -U smartgn_iam -d iam_db'], interval: 2s, timeout: 2s, retries: 30}
+  installation-db:
+    image: postgres:17.6
+    environment: {POSTGRES_DB: installation_db, POSTGRES_USER: smartgn_installation, POSTGRES_PASSWORD: '${DB_PASSWORD}'}
+    volumes: [installation-integration-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, 'pg_isready -U smartgn_installation -d installation_db'], interval: 2s, timeout: 2s, retries: 30}
+  iam:
+    build: ../smartgn-iam
+    ports: ["127.0.0.1:18080:8080"]
+    environment:
+      DB_URL: jdbc:postgresql://iam-db:5432/iam_db
+      DB_USERNAME: smartgn_iam
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      DELIVERY_ENCRYPTION_KEY: ${DELIVERY_ENCRYPTION_KEY}
+      NOTIFICATION_DELIVERY_URL: http://delivery:8091/local-contracts/notifications
+      NOTIFICATION_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      INSTALLATION_BASE_URL: http://installation:8081
+      SMARTGN_BILLING_BASE_URL: http://billing:8083
+      SMARTGN_BILLING_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      IDENTITY_EVENT_SINK_URL: http://delivery:8091/local-contracts/events
+      IDENTITY_EVENT_SINK_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      SPRING_PROFILES_ACTIVE: local-bootstrap
+      BOOTSTRAP_SUPERADMIN_EMAIL: admin@smartgn.test
+      BOOTSTRAP_SUPERADMIN_PASSWORD: ${BOOTSTRAP_SUPERADMIN_PASSWORD}
+    depends_on: {iam-db: {condition: service_healthy}}
+  installation:
+    build: ../smartgn-installation-device-management
+    ports: ["127.0.0.1:18081:8081"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://installation-db:5432/installation_db
+      SPRING_DATASOURCE_USERNAME: smartgn_installation
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      DEVICE_CREDENTIAL_KEY: ${DEVICE_CREDENTIAL_KEY}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      EMQX_PASSWORD: ${MQTT_PASSWORD}
+      SMARTGN_IAM_BASE_URL: http://iam:8080
+      SMARTGN_EVENTS_SINK_URL: http://billing:8083/internal/v1/events
+      SMARTGN_EVENTS_SINK_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+    depends_on: {installation-db: {condition: service_healthy}}
+  delivery:
+    image: python:3.13-slim
+    command: [python, /tools/local-delivery-fixture.py]
+    ports: ["127.0.0.1:18091:8091"]
+    environment:
+      FIXTURE_ADMIN_TOKEN: ${FIXTURE_ADMIN_TOKEN}
+      NOTIFICATION_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      EVENT_FIXTURE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+    volumes: ["./tools:/tools:ro", "delivery-data:/data"]
+volumes:
+  billing-data:
+  mqtt-data:
+  billing-integration-data:
+  iam-integration-data:
+  installation-integration-data:
+  delivery-data:

@@ -1,0 +1,51 @@
+name: smartgn-billing
+services:
+  db:
+    image: postgres:17.6
+    environment:
+      POSTGRES_DB: billing_db
+      POSTGRES_USER: smartgn_billing
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    ports: ["127.0.0.1:5434:5432"]
+    volumes: [billing-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U smartgn_billing -d billing_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  billing:
+    build: .
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/billing_db
+      DB_PASSWORD: ${DB_PASSWORD}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      JWT_SECRET: ${JWT_SECRET}
+      IAM_BASE_URL: ${IAM_BASE_URL:-http://host.docker.internal:8080}
+      INSTALLATION_BASE_URL: ${INSTALLATION_BASE_URL:-http://host.docker.internal:8081}
+      SPRING_PROFILES_ACTIVE: local
+      CARD_ENCRYPTION_KEY: ${CARD_ENCRYPTION_KEY:?Generate local configuration}
+      MQTT_URL: tcp://broker:1883
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      SUNAT_MODE: ${SUNAT_MODE:-local}
+      FISCAL_RUC: ${FISCAL_RUC:-20100066603}
+      FISCAL_NAME: ${FISCAL_NAME:-SmartGN DEMO}
+      FISCAL_ADDRESS: ${FISCAL_ADDRESS:-Lima Peru DEMO}
+      TAX_KEYSTORE_PATH: /run/secrets/tax.p12
+      TAX_KEY_PASSWORD: ${TAX_KEY_PASSWORD}
+      SUNAT_USER: ${SUNAT_USER:-20100066603MODDATOS}
+      SUNAT_PASSWORD: ${SUNAT_PASSWORD:-MODDATOS}
+      DEVICE_PRICE: ${DEVICE_PRICE:-200.00}
+      INSTALLATION_PRICE: ${INSTALLATION_PRICE:-50.00}
+      PRO_PRICE: ${PRO_PRICE:-35.00}
+      TECHNICAL_BASE_PRICE: ${TECHNICAL_BASE_PRICE:-20.00}
+    volumes: ["./.local/tax.p12:/run/secrets/tax.p12:ro"]
+    ports: ["127.0.0.1:8083:8083"]
+    depends_on:
+      db: {condition: service_healthy}
+  broker:
+    image: eclipse-mosquitto:2
+    ports: ["127.0.0.1:1884:1883"]
+    volumes: ["./.local/mqtt:/mosquitto/config:ro", "mqtt-data:/mosquitto/data"]
+volumes:
+  mqtt-data:
+  billing-data:
