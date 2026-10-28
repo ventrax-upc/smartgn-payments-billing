@@ -1,0 +1,54 @@
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  application:
+    name: smartgn-payments-billing
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/billing_db}
+    username: ${DB_USERNAME:smartgn_billing}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-init-sql: SET search_path TO billing
+  flyway:
+    schemas: billing
+    default-schema: billing
+    create-schemas: true
+server:
+  port: ${PORT:8083}
+  error:
+    include-message: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+smartgn:
+  internal-token: ${INTERNAL_SERVICE_TOKEN}
+  iam-url: ${IAM_BASE_URL:http://localhost:8080}
+  installation-url: ${INSTALLATION_BASE_URL:http://localhost:8081}
+  jwt-secret: ${JWT_SECRET}
+  device-price: ${DEVICE_PRICE:200.00}
+  installation-price: ${INSTALLATION_PRICE:50.00}
+  pro-price: ${PRO_PRICE:35.00}
+  technical-base-price: ${TECHNICAL_BASE_PRICE:20.00}
+  allowed-origin: ${ALLOWED_ORIGIN:http://localhost:4200}
+
+  card-key: ${CARD_ENCRYPTION_KEY}
+  mqtt:
+    url: ${MQTT_URL:}
+    user: ${MQTT_USERNAME:billing-service}
+    password: ${MQTT_PASSWORD:}
+    client-id: ${MQTT_CLIENT_ID:smartgn-billing}
+  tax:
+    mode: ${SUNAT_MODE:disabled}
+    ruc: ${FISCAL_RUC:}
+    name: ${FISCAL_NAME:}
+    address: ${FISCAL_ADDRESS:}
+    ubigeo: ${FISCAL_UBIGEO:150101}
+    key-path: ${TAX_KEYSTORE_PATH:}
+    key-password: ${TAX_KEY_PASSWORD:}
+    rate: ${TAX_RATE:0.18}
+    endpoint: ${SUNAT_ENDPOINT:https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService}
+    user: ${SUNAT_USER:}
+    password: ${SUNAT_PASSWORD:}
