@@ -1,7 +1,14 @@
-.env
-.local/
 target/
+.local/
+.env
+.env.*
+!.env.example
 *.log
-
+*.pid
 __pycache__/
 *.pyc
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

@@ -2,3 +2,7 @@
 .local
 target
 .env
+.env.*
+*.log
+.idea
+.vscode

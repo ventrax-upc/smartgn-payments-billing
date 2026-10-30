@@ -13,8 +13,10 @@ if(-not (Test-Path .local/tax.p12)){
  if($LASTEXITCODE -ne 0){throw 'Local signing key generation failed'}
 }
 $env:MQTT_PASSWORD=$settings['MQTT_PASSWORD'];$env:MQTT_SUPPORT_PASSWORD=$settings['MQTT_SUPPORT_PASSWORD'];$env:MQTT_INSTALLATION_PASSWORD=$settings['MQTT_INSTALLATION_PASSWORD']
-docker run --rm -e MQTT_PASSWORD -e MQTT_SUPPORT_PASSWORD -e MQTT_INSTALLATION_PASSWORD -v "${PWD}/.local/mqtt:/config" --entrypoint sh eclipse-mosquitto:2 -c 'mosquitto_passwd -b -c /config/passwords billing-service "$MQTT_PASSWORD" && mosquitto_passwd -b /config/passwords support-service "$MQTT_SUPPORT_PASSWORD" && mosquitto_passwd -b /config/passwords installation-service "$MQTT_INSTALLATION_PASSWORD" && chmod 644 /config/passwords'
-if($LASTEXITCODE -ne 0){throw 'Broker credentials generation failed'}
+if(-not (Test-Path .local/mqtt/passwords)){
+ docker run --rm --user 0:0 -e MQTT_PASSWORD -e MQTT_SUPPORT_PASSWORD -e MQTT_INSTALLATION_PASSWORD -v "${PWD}/.local/mqtt:/config" --entrypoint sh eclipse-mosquitto:2 -c 'mosquitto_passwd -b -c /tmp/passwords billing-service "$MQTT_PASSWORD" && mosquitto_passwd -b /tmp/passwords support-service "$MQTT_SUPPORT_PASSWORD" && mosquitto_passwd -b /tmp/passwords installation-service "$MQTT_INSTALLATION_PASSWORD" && cp /tmp/passwords /config/passwords && chmod 644 /config/passwords'
+ if($LASTEXITCODE -ne 0){throw 'Broker credentials generation failed'}
+}
 @'
 listener 1883
 allow_anonymous false

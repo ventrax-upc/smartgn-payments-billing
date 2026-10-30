@@ -1,9 +1,12 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "SmartGN Payments and Billing",
-    "description": "Sprint 2 payments, subscriptions, coverage and electronic invoicing. Local provider fixtures are explicitly test doubles; fiscal beta results have no production validity.",
-    "version": "0.1.0"
+    "title": "SmartGN - Payments & Billing",
+    "description": "Verified purchases, tokenized payment methods, paid subscription periods, technical coverage and fiscal documents. Owns an independent PostgreSQL database and integrates through authenticated HTTP and durable events. Local fixtures do not establish productive external integration.",
+    "license": {
+      "name": "MIT"
+    },
+    "version": "v1"
   },
   "servers": [
     {
@@ -11,18 +14,54 @@
       "description": "Generated server url"
     }
   ],
+  "tags": [
+    {
+      "name": "Checkout",
+      "description": "Server-priced provisional purchases protected by private checkout secrets."
+    },
+    {
+      "name": "Payment methods",
+      "description": "Principal-owned provider tokens and masked payment metadata."
+    },
+    {
+      "name": "Subscriptions",
+      "description": "Authoritative paid periods, entitlements and renewal consent."
+    },
+    {
+      "name": "Payments",
+      "description": "Owned orders, verified payment operations and financial history."
+    },
+    {
+      "name": "Technical statements",
+      "description": "Frozen cost, coverage and balance after a completed visit."
+    },
+    {
+      "name": "Billing documents",
+      "description": "Owned fiscal metadata and downloadable test or provider artifacts."
+    },
+    {
+      "name": "Internal payments",
+      "description": "Private service-to-service contracts."
+    },
+    {
+      "name": "Local test fixtures",
+      "description": "Explicit development-only provider fixtures."
+    }
+  ],
   "paths": {
     "/api/v1/payment-methods/{id}/default": {
       "put": {
         "tags": [
-          "card-controller"
+          "Payment methods"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Select a default payment method",
+        "description": "Requires principal ownership of an active method. Selection is atomic within the account. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "primary",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -32,7 +71,13 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -45,9 +90,10 @@
     "/internal/v1/technical-visits/completions": {
       "post": {
         "tags": [
-          "billing-controller"
+          "Internal payments"
         ],
-        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "summary": "Apply a completed technical visit",
+        "description": "Accepts Support's stable event, visit, account, meter, effective completion timestamp and final cost. Replays cannot create another charge. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
         "operationId": "visit",
         "requestBody": {
           "content": {
@@ -61,7 +107,10 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing or invalid private service credential."
           }
         },
         "security": [
@@ -74,9 +123,10 @@
     "/internal/v1/payments/confirmations": {
       "post": {
         "tags": [
-          "billing-controller"
+          "Internal payments"
         ],
-        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "summary": "Apply verified provider payment evidence",
+        "description": "Re-verifies the provider reference, order and amount. Browser-return parameters are never proof of payment. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
         "operationId": "confirmation",
         "requestBody": {
           "content": {
@@ -90,7 +140,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -98,6 +148,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid private service credential."
           }
         },
         "security": [
@@ -110,9 +163,10 @@
     "/internal/v1/local-provider/results": {
       "post": {
         "tags": [
-          "local-fixture-controller"
+          "Local test fixtures"
         ],
-        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "summary": "Record local provider result evidence",
+        "description": "Available only in the local profile. Controls CONFIRMED, DECLINED or UNKNOWN test evidence without representing a real financial transaction. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
         "operationId": "result",
         "requestBody": {
           "content": {
@@ -126,7 +180,10 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing or invalid private service credential."
           }
         },
         "security": [
@@ -139,9 +196,10 @@
     "/internal/v1/local-provider/cards": {
       "post": {
         "tags": [
-          "local-fixture-controller"
+          "Local test fixtures"
         ],
-        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "summary": "Register local card ownership evidence",
+        "description": "Available only in the local profile. Establishes controlled token ownership and provider-result behavior; this is not a productive merchant API. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
         "operationId": "card",
         "requestBody": {
           "content": {
@@ -155,7 +213,10 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing or invalid private service credential."
           }
         },
         "security": [
@@ -168,9 +229,10 @@
     "/internal/v1/events": {
       "post": {
         "tags": [
-          "event-controller"
+          "Internal payments"
         ],
-        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "summary": "Receive an integration event",
+        "description": "Processes supported InstallationCompleted and TechnicalVisitCompleted facts with idempotency and content-conflict checks. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
         "operationId": "receive",
         "requestBody": {
           "content": {
@@ -185,7 +247,10 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing or invalid private service credential."
           }
         },
         "security": [
@@ -198,14 +263,16 @@
     "/api/v1/subscriptions/pro": {
       "post": {
         "tags": [
-          "billing-controller"
+          "Subscriptions"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Request a monthly Pro subscription",
+        "description": "Requires a verified owned payment method and Idempotency-Key. Pro activates only after confirmed payment. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "pro",
         "parameters": [
           {
             "name": "Idempotency-Key",
             "in": "header",
+            "description": "Stable caller-generated key. Reuse it only for retries with the same business content.",
             "required": true,
             "schema": {
               "type": "string"
@@ -224,7 +291,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -232,6 +299,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -244,14 +317,16 @@
     "/api/v1/payments/orders/{id}/retry": {
       "post": {
         "tags": [
-          "subscription-controller"
+          "Payments"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Retry a declined payment order",
+        "description": "Requires principal ownership and Idempotency-Key. Explicit retries apply to verified declines, not unresolved operations. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "retry",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -261,6 +336,7 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
+            "description": "Stable caller-generated key. Reuse it only for retries with the same business content.",
             "required": true,
             "schema": {
               "type": "string"
@@ -279,7 +355,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -287,6 +363,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -299,14 +381,16 @@
     "/api/v1/payments/orders/{id}/pay": {
       "post": {
         "tags": [
-          "subscription-controller"
+          "Payments"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Pay an owned pending order",
+        "description": "Requires an owned verified method and an eligible order. Unknown provider results remain unresolved and cannot create a second debit. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "pay",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -326,7 +410,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -334,6 +418,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -346,13 +436,14 @@
     "/api/v1/payment-methods": {
       "get": {
         "tags": [
-          "card-controller"
+          "Payment methods"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "List owned payment methods",
+        "description": "Requires the principal account. Returns masked metadata only; PAN and CVV are never accepted or stored. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "list",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -360,6 +451,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -370,9 +467,10 @@
       },
       "post": {
         "tags": [
-          "card-controller"
+          "Payment methods"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Register an owned payment token",
+        "description": "Requires the principal account and provider-verified token ownership. Stores a protected token and masked card metadata. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "add",
         "requestBody": {
           "content": {
@@ -386,7 +484,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -394,6 +492,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -406,14 +510,16 @@
     "/api/v1/checkout/orders": {
       "post": {
         "tags": [
-          "billing-controller"
+          "Checkout"
         ],
-        "description": "Anonymous checkout; subsequent order access requires the private X-Checkout-Secret.",
+        "summary": "Create a priced checkout order",
+        "description": "Validates the provisional Installation contact and calculates device/installation prices on the server. Requires Idempotency-Key and a private X-Checkout-Secret. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
         "operationId": "checkout",
         "parameters": [
           {
             "name": "Idempotency-Key",
             "in": "header",
+            "description": "Stable caller-generated key. Reuse it only for retries with the same business content.",
             "required": true,
             "schema": {
               "type": "string",
@@ -424,6 +530,7 @@
           {
             "name": "X-Checkout-Secret",
             "in": "header",
+            "description": "Private caller-generated checkout secret. Keep it confidential; an order UUID alone does not authorize access.",
             "required": true,
             "schema": {
               "type": "string",
@@ -444,7 +551,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Resource created.",
             "content": {
               "*/*": {
                 "schema": {
@@ -460,14 +567,16 @@
     "/api/v1/checkout/orders/{id}/sessions": {
       "post": {
         "tags": [
-          "session-controller"
+          "Checkout"
         ],
-        "description": "Anonymous checkout; subsequent order access requires the private X-Checkout-Secret.",
+        "summary": "Create checkout session instructions",
+        "description": "Requires the private checkout secret. Local instructions are an explicit test adapter, not a productive Niubiz hosted checkout. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
         "operationId": "session",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -477,6 +586,7 @@
           {
             "name": "X-Checkout-Secret",
             "in": "header",
+            "description": "Private caller-generated checkout secret. Keep it confidential; an order UUID alone does not authorize access.",
             "required": true,
             "schema": {
               "type": "string"
@@ -485,7 +595,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -501,9 +611,10 @@
     "/api/v1/subscriptions/me/renewal": {
       "patch": {
         "tags": [
-          "subscription-controller"
+          "Subscriptions"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Change automatic renewal consent",
+        "description": "Requires the principal account. Enabling renewal requires an active method with recurring-payment consent. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "renewal",
         "requestBody": {
           "content": {
@@ -517,7 +628,13 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -530,14 +647,16 @@
     "/internal/v1/accounts/{id}/entitlements": {
       "get": {
         "tags": [
-          "billing-controller"
+          "Internal payments"
         ],
-        "description": "Internal service credential required. Exclude from public gateway routes.",
+        "summary": "Get an authoritative account entitlement",
+        "description": "Reads only Billing's paid periods and effective plan, avoiding authorization callback loops. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
         "operationId": "entitlement",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -547,7 +666,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -555,6 +674,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid private service credential."
           }
         },
         "security": [
@@ -567,14 +689,16 @@
     "/api/v1/technical-statements/{id}": {
       "get": {
         "tags": [
-          "subscription-controller"
+          "Technical statements"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Get a completed visit statement",
+        "description": "Requires principal ownership. Returns the frozen final cost, coverage, balance and payable order reference; coverage uses the effective completion timestamp. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "statement",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -584,7 +708,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -592,6 +716,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -604,13 +734,14 @@
     "/api/v1/subscriptions/me": {
       "get": {
         "tags": [
-          "billing-controller"
+          "Subscriptions"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Get the current subscription entitlement",
+        "description": "Requires the principal account. Returns the effective plan and paid-through period; JWT plan claims are not authoritative. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "plan",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -618,6 +749,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -630,14 +767,16 @@
     "/api/v1/payments/orders/{id}": {
       "get": {
         "tags": [
-          "subscription-controller"
+          "Payments"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Get an owned payment order",
+        "description": "Requires principal ownership and returns the order's persisted financial state. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "order",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -647,7 +786,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -655,6 +794,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -667,34 +812,41 @@
     "/api/v1/payments/history": {
       "get": {
         "tags": [
-          "billing-controller"
+          "Payments"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "List owned financial history",
+        "description": "Requires the principal account. Applies offset/limit and optional reason/status filters to owned orders, attempts and document references. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "history",
         "parameters": [
           {
             "name": "offset",
             "in": "query",
+            "description": "Zero-based number of matching records to skip.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0
+              "default": 0,
+              "minimum": 0
             }
           },
           {
             "name": "limit",
             "in": "query",
+            "description": "Maximum number of matching records to return, from 1 to 100.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 50
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1
             }
           },
           {
             "name": "reason",
             "in": "query",
+            "description": "Optional financial billing-reason filter.",
             "required": false,
             "schema": {
               "type": "string"
@@ -703,6 +855,7 @@
           {
             "name": "status",
             "in": "query",
+            "description": "Optional lifecycle-status filter using the service's documented state values.",
             "required": false,
             "schema": {
               "type": "string"
@@ -711,7 +864,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -719,6 +872,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -731,14 +890,16 @@
     "/api/v1/checkout/orders/{id}": {
       "get": {
         "tags": [
-          "billing-controller"
+          "Checkout"
         ],
-        "description": "Anonymous checkout; subsequent order access requires the private X-Checkout-Secret.",
+        "summary": "Get a private checkout order",
+        "description": "Requires the matching X-Checkout-Secret. The order UUID alone does not authorize access. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
         "operationId": "order_1",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -748,6 +909,7 @@
           {
             "name": "X-Checkout-Secret",
             "in": "header",
+            "description": "Private caller-generated checkout secret. Keep it confidential; an order UUID alone does not authorize access.",
             "required": true,
             "schema": {
               "type": "string"
@@ -756,7 +918,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -772,14 +934,16 @@
     "/api/v1/billing-documents/{id}": {
       "get": {
         "tags": [
-          "billing-controller"
+          "Billing documents"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Get an owned billing document",
+        "description": "Requires principal ownership. Fiscal response status is independent from payment status; local/beta results are explicitly marked as test evidence. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "document",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -789,7 +953,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
               "*/*": {
                 "schema": {
@@ -797,6 +961,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -809,14 +979,16 @@
     "/api/v1/billing-documents/{id}/download": {
       "get": {
         "tags": [
-          "fiscal-controller"
+          "Billing documents"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Download an owned fiscal artifact",
+        "description": "Requires principal ownership. Supports PDF, signed XML and CDR ZIP when available; unavailable artifacts are rejected. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "download",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -826,24 +998,48 @@
           {
             "name": "format",
             "in": "query",
+            "description": "Fiscal artifact format: pdf, xml or cdr (ZIP). Availability depends on the stored fiscal evidence.",
             "required": false,
             "schema": {
               "type": "string",
-              "default": "pdf"
+              "default": "pdf",
+              "enum": [
+                "pdf",
+                "xml",
+                "cdr"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Operation completed successfully.",
             "content": {
-              "*/*": {
+              "application/pdf": {
                 "schema": {
                   "type": "string",
-                  "format": "byte"
+                  "format": "binary"
+                }
+              },
+              "application/xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -856,14 +1052,16 @@
     "/api/v1/payment-methods/{id}": {
       "delete": {
         "tags": [
-          "card-controller"
+          "Payment methods"
         ],
-        "description": "Current IAM session, principal account and ownership are checked by Billing.",
+        "summary": "Unlink an owned payment method",
+        "description": "Requires principal ownership. Disables dependent renewal consent and preserves masked history; unresolved operations must be reconciled first. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
         "operationId": "delete",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
             "required": true,
             "schema": {
               "type": "string",
@@ -873,7 +1071,13 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Operation completed successfully."
+          },
+          "401": {
+            "description": "Missing, expired, revoked or invalid IAM session."
+          },
+          "403": {
+            "description": "The current account does not have the required role, ownership or meter/function permission."
           }
         },
         "security": [
@@ -1096,12 +1300,13 @@
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
+        "description": "Current IAM JWT. The service verifies the active session and operation-specific ownership, role and meter/function permissions. Roles: USER and SUPERADMIN.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
       "serviceAuth": {
         "type": "http",
-        "description": "Independent internal service credential",
+        "description": "Private service credential, independent of user JWTs. Internal routes must remain outside public gateway routing.",
         "scheme": "bearer"
       }
     }

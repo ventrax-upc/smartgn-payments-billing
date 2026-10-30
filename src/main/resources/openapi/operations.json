@@ -1,0 +1,224 @@
+{
+  "title": "SmartGN - Payments & Billing",
+  "version": "v1",
+  "description": "Verified purchases, tokenized payment methods, paid subscription periods, technical coverage and fiscal documents. Owns an independent PostgreSQL database and integrates through authenticated HTTP and durable events. Local fixtures do not establish productive external integration.",
+  "tags": {
+    "Checkout": "Server-priced provisional purchases protected by private checkout secrets.",
+    "Payment methods": "Principal-owned provider tokens and masked payment metadata.",
+    "Subscriptions": "Authoritative paid periods, entitlements and renewal consent.",
+    "Payments": "Owned orders, verified payment operations and financial history.",
+    "Technical statements": "Frozen cost, coverage and balance after a completed visit.",
+    "Billing documents": "Owned fiscal metadata and downloadable test or provider artifacts.",
+    "Internal payments": "Private service-to-service contracts.",
+    "Local test fixtures": "Explicit development-only provider fixtures."
+  },
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/orders",
+      "tag": "Checkout",
+      "summary": "Create a priced checkout order",
+      "description": "Validates the provisional Installation contact and calculates device/installation prices on the server. Requires Idempotency-Key and a private X-Checkout-Secret. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
+      "success": 201,
+      "security": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/checkout/orders/{id}",
+      "tag": "Checkout",
+      "summary": "Get a private checkout order",
+      "description": "Requires the matching X-Checkout-Secret. The order UUID alone does not authorize access. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
+      "success": 200,
+      "security": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/orders/{id}/sessions",
+      "tag": "Checkout",
+      "summary": "Create checkout session instructions",
+      "description": "Requires the private checkout secret. Local instructions are an explicit test adapter, not a productive Niubiz hosted checkout. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
+      "success": 200,
+      "security": ""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payment-methods",
+      "tag": "Payment methods",
+      "summary": "List owned payment methods",
+      "description": "Requires the principal account. Returns masked metadata only; PAN and CVV are never accepted or stored. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payment-methods",
+      "tag": "Payment methods",
+      "summary": "Register an owned payment token",
+      "description": "Requires the principal account and provider-verified token ownership. Stores a protected token and masked card metadata. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/payment-methods/{id}/default",
+      "tag": "Payment methods",
+      "summary": "Select a default payment method",
+      "description": "Requires principal ownership of an active method. Selection is atomic within the account. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/payment-methods/{id}",
+      "tag": "Payment methods",
+      "summary": "Unlink an owned payment method",
+      "description": "Requires principal ownership. Disables dependent renewal consent and preserves masked history; unresolved operations must be reconciled first. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/me",
+      "tag": "Subscriptions",
+      "summary": "Get the current subscription entitlement",
+      "description": "Requires the principal account. Returns the effective plan and paid-through period; JWT plan claims are not authoritative. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/subscriptions/pro",
+      "tag": "Subscriptions",
+      "summary": "Request a monthly Pro subscription",
+      "description": "Requires a verified owned payment method and Idempotency-Key. Pro activates only after confirmed payment. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/subscriptions/me/renewal",
+      "tag": "Subscriptions",
+      "summary": "Change automatic renewal consent",
+      "description": "Requires the principal account. Enabling renewal requires an active method with recurring-payment consent. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/orders/{id}",
+      "tag": "Payments",
+      "summary": "Get an owned payment order",
+      "description": "Requires principal ownership and returns the order's persisted financial state. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/orders/{id}/pay",
+      "tag": "Payments",
+      "summary": "Pay an owned pending order",
+      "description": "Requires an owned verified method and an eligible order. Unknown provider results remain unresolved and cannot create a second debit. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/orders/{id}/retry",
+      "tag": "Payments",
+      "summary": "Retry a declined payment order",
+      "description": "Requires principal ownership and Idempotency-Key. Explicit retries apply to verified declines, not unresolved operations. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/history",
+      "tag": "Payments",
+      "summary": "List owned financial history",
+      "description": "Requires the principal account. Applies offset/limit and optional reason/status filters to owned orders, attempts and document references. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/technical-statements/{id}",
+      "tag": "Technical statements",
+      "summary": "Get a completed visit statement",
+      "description": "Requires principal ownership. Returns the frozen final cost, coverage, balance and payable order reference; coverage uses the effective completion timestamp. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/billing-documents/{id}",
+      "tag": "Billing documents",
+      "summary": "Get an owned billing document",
+      "description": "Requires principal ownership. Fiscal response status is independent from payment status; local/beta results are explicitly marked as test evidence. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/billing-documents/{id}/download",
+      "tag": "Billing documents",
+      "summary": "Download an owned fiscal artifact",
+      "description": "Requires principal ownership. Supports PDF, signed XML and CDR ZIP when available; unavailable artifacts are rejected. Authentication: current IAM JWT; roles are USER and SUPERADMIN.",
+      "success": 200,
+      "security": "bearerAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/internal/v1/payments/confirmations",
+      "tag": "Internal payments",
+      "summary": "Apply verified provider payment evidence",
+      "description": "Re-verifies the provider reference, order and amount. Browser-return parameters are never proof of payment. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
+      "success": 200,
+      "security": "serviceAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/internal/v1/technical-visits/completions",
+      "tag": "Internal payments",
+      "summary": "Apply a completed technical visit",
+      "description": "Accepts Support's stable event, visit, account, meter, effective completion timestamp and final cost. Replays cannot create another charge. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
+      "success": 200,
+      "security": "serviceAuth"
+    },
+    {
+      "method": "GET",
+      "path": "/internal/v1/accounts/{id}/entitlements",
+      "tag": "Internal payments",
+      "summary": "Get an authoritative account entitlement",
+      "description": "Reads only Billing's paid periods and effective plan, avoiding authorization callback loops. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
+      "success": 200,
+      "security": "serviceAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/internal/v1/events",
+      "tag": "Internal payments",
+      "summary": "Receive an integration event",
+      "description": "Processes supported InstallationCompleted and TechnicalVisitCompleted facts with idempotency and content-conflict checks. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
+      "success": 200,
+      "security": "serviceAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/internal/v1/local-provider/cards",
+      "tag": "Local test fixtures",
+      "summary": "Register local card ownership evidence",
+      "description": "Available only in the local profile. Establishes controlled token ownership and provider-result behavior; this is not a productive merchant API. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
+      "success": 200,
+      "security": "serviceAuth"
+    },
+    {
+      "method": "POST",
+      "path": "/internal/v1/local-provider/results",
+      "tag": "Local test fixtures",
+      "summary": "Record local provider result evidence",
+      "description": "Available only in the local profile. Controls CONFIRMED, DECLINED or UNKNOWN test evidence without representing a real financial transaction. Authentication: private service credential; user JWTs are not accepted. Internal routes must remain outside public gateway routing.",
+      "success": 200,
+      "security": "serviceAuth"
+    }
+  ]
+}
