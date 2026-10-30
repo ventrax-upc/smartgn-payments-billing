@@ -20,6 +20,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
+      SUPPORT_BASE_URL: ${SUPPORT_BASE_URL:-http://host.docker.internal:8082}
       IAM_BASE_URL: ${IAM_BASE_URL:-http://host.docker.internal:8080}
       INSTALLATION_BASE_URL: ${INSTALLATION_BASE_URL:-http://host.docker.internal:8081}
       SPRING_PROFILES_ACTIVE: local

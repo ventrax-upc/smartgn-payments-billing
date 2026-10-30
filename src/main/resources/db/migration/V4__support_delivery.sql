@@ -1,0 +1,2 @@
+ALTER TABLE outbox ADD COLUMN support_delivered_at timestamptz, ADD COLUMN support_available_at timestamptz NOT NULL DEFAULT now(), ADD COLUMN support_lease_id uuid, ADD COLUMN support_lease_until timestamptz, ADD COLUMN support_attempts integer NOT NULL DEFAULT 0;
+CREATE INDEX outbox_support_due ON outbox(support_available_at) WHERE event_type='CoverageCalculated' AND support_delivered_at IS NULL;

@@ -39,3 +39,5 @@ A repeated event ID with different business content is a conflict. Repeated visi
 ## Fiscal states
 
 PENDING_CONFIGURATION means no document has been generated. ISSUED_TEST means XML/PDF exist with a test certificate. SUBMITTED retains the provider ticket. LOCAL_ACCEPTED identifies the local tax double only; TEST_ACCEPTED/TEST_OBSERVED/TEST_REJECTED identify beta results. A transport failure retains retry state and the same signed summary; a SOAP rejection stores its code/description for regularization. No state claims productive SUNAT validity. Production fiscal identity/certificates and merchant Niubiz contracts remain external prerequisites.
+
+CoverageCalculated is delivered durably to Support's `/internal/v1/events` when SUPPORT_BASE_URL is configured. HTTP and MQTT have independent receipts and stable event IDs. Non-financial Support lifecycle events are ignored by Billing.

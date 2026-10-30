@@ -25,6 +25,7 @@ management:
         include: health
 smartgn:
   internal-token: ${INTERNAL_SERVICE_TOKEN}
+  support-url: ${SUPPORT_BASE_URL:}
   iam-url: ${IAM_BASE_URL:http://localhost:8080}
   installation-url: ${INSTALLATION_BASE_URL:http://localhost:8081}
   jwt-secret: ${JWT_SECRET}

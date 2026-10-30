@@ -6,12 +6,16 @@ services:
     volumes: [billing-integration-data:/var/lib/postgresql/data]
     healthcheck: {test: [CMD-SHELL, 'pg_isready -U smartgn_billing -d billing_db'], interval: 2s, timeout: 2s, retries: 30}
   broker:
-    extends: {file: compose.yml, service: broker}
+    volumes: !override ["../smartgn-payments-billing/.local/mqtt:/mosquitto/config:ro", "mqtt-data:/mosquitto/data"]
+    extends: {file: ../smartgn-payments-billing/compose.yml, service: broker}
     ports: !override ["127.0.0.1:1885:1883"]
   billing:
-    extends: {file: compose.yml, service: billing}
+    build: ../smartgn-payments-billing
+    volumes: !override ["../smartgn-payments-billing/.local/tax.p12:/run/secrets/tax.p12:ro"]
+    extends: {file: ../smartgn-payments-billing/compose.yml, service: billing}
     ports: !override ["127.0.0.1:28083:8083"]
     environment:
+      SUPPORT_BASE_URL: http://support:8082
       IAM_BASE_URL: http://iam:8080
       INSTALLATION_BASE_URL: http://installation:8081
       MQTT_CLIENT_ID: smartgn-billing-integration
@@ -71,7 +75,37 @@ services:
       FIXTURE_ADMIN_TOKEN: ${FIXTURE_ADMIN_TOKEN}
       NOTIFICATION_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       EVENT_FIXTURE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
-    volumes: ["./tools:/tools:ro", "delivery-data:/data"]
+    volumes: ["../smartgn-payments-billing/tools:/tools:ro", "delivery-data:/data"]
+  support-db:
+    image: postgres:17.6
+    environment:
+      POSTGRES_DB: smartgn_support_db
+      POSTGRES_USER: smartgn_support
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: [support-integration-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U smartgn_support -d smartgn_support_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  support:
+    build: ${SUPPORT_REPO_PATH:-../smartgn-support-maintenance}
+    environment:
+      DB_URL: jdbc:postgresql://support-db:5432/smartgn_support_db
+      DB_PASSWORD: ${DB_PASSWORD}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      IAM_BASE_URL: http://iam:8080
+      INSTALLATION_BASE_URL: http://installation:8081
+      BILLING_BASE_URL: http://billing:8083
+      PHOTO_PATH: /data/photos
+      MQTT_URL: ${SUPPORT_MQTT_URL:-}
+      MQTT_USERNAME: support-service
+      MQTT_PASSWORD: ${MQTT_SUPPORT_PASSWORD}
+      MQTT_CLIENT_ID: smartgn-support-integration
+    ports: ["127.0.0.1:8082:8082"]
+    volumes: [support-integration-photos:/data]
+    depends_on:
+      support-db: {condition: service_healthy}
 volumes:
   billing-data:
   mqtt-data:
@@ -79,3 +113,5 @@ volumes:
   iam-integration-data:
   installation-integration-data:
   delivery-data:
+  support-integration-db:
+  support-integration-photos:
