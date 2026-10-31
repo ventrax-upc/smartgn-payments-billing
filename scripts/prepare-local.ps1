@@ -3,7 +3,7 @@ Set-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
 New-Item -ItemType Directory -Force .local/mqtt | Out-Null
 $settings = @{}
 if(Test-Path .env){foreach($line in Get-Content .env){if($line -match '^([A-Z_]+)=(.*)$'){$settings[$Matches[1]]=$Matches[2]}}}
-foreach($name in @('DB_PASSWORD','INTERNAL_SERVICE_TOKEN','JWT_SECRET','MQTT_PASSWORD','MQTT_SUPPORT_PASSWORD','MQTT_INSTALLATION_PASSWORD','TAX_KEY_PASSWORD','FIXTURE_ADMIN_TOKEN','BOOTSTRAP_SUPERADMIN_PASSWORD')){if(-not $settings.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($settings[$name])){$settings[$name]=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))}}
+foreach($name in @('DB_PASSWORD','INTERNAL_SERVICE_TOKEN','JWT_SECRET','MQTT_PASSWORD','MQTT_SUPPORT_PASSWORD','MQTT_INSTALLATION_PASSWORD','TAX_KEY_PASSWORD','FIXTURE_ADMIN_TOKEN','BOOTSTRAP_SUPERADMIN_PASSWORD','DEVICE_BROKER_API_KEY','DEVICE_BROKER_API_SECRET')){if(-not $settings.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($settings[$name])){$settings[$name]=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))}}
 foreach($name in @('DELIVERY_ENCRYPTION_KEY','DEVICE_CREDENTIAL_KEY')){if(-not $settings.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($settings[$name])){$settings[$name]=[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))}}
 if(-not $settings.ContainsKey('CARD_ENCRYPTION_KEY') -or [string]::IsNullOrWhiteSpace($settings['CARD_ENCRYPTION_KEY'])){$settings['CARD_ENCRYPTION_KEY']=[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))}
 $settings.GetEnumerator() | Sort-Object Name | ForEach-Object {"$($_.Name)=$($_.Value)"} | Set-Content .env
@@ -39,3 +39,6 @@ topic write smartgn/events/support/#
 topic read smartgn/events/payments/#
 '@ | Set-Content .local/mqtt/acl
 Write-Output 'Local test keys and authenticated broker configuration prepared; secrets remain in ignored files.'
+
+New-Item -ItemType Directory -Force .local/device-broker | Out-Null
+($settings['DEVICE_BROKER_API_KEY']+':'+$settings['DEVICE_BROKER_API_SECRET']) | Set-Content -Encoding ascii .local/device-broker/bootstrap-api-keys
