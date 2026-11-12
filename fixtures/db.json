@@ -1,0 +1,14 @@
+{
+  "service": "billing",
+  "version": 1,
+  "records": [
+    {
+      "type": "paymentMethod",
+      "alias": "demo-plan-pro",
+      "account": "demo-account-pro",
+      "amount": 250,
+      "brand": "VISA",
+      "lastFour": "1234"
+    }
+  ]
+}
