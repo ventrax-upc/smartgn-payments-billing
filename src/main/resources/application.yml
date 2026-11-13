@@ -1,9 +1,24 @@
 spring:
+  grpc:
+    server:
+      port: ${GRPC_PORT:9083}
   jackson:
     deserialization:
       fail-on-unknown-properties: true
   application:
     name: smartgn-payments-billing
+  config:
+    import: ${SPRING_CONFIG_IMPORT:optional:configserver:${SMARTGN_CONFIG_URL:http://config:8088}}
+  boot:
+    admin:
+      client:
+        url: ${SMARTGN_ADMIN_URL:http://admin:8089}
+        username: ${SMARTGN_ADMIN_USERNAME:smartgn}
+        password: ${SMARTGN_ADMIN_PASSWORD:}
+        instance:
+          service-url: ${ADMIN_SERVICE_URL:http://billing:8083}
+          management-url: ${ADMIN_MANAGEMENT_URL:http://billing:8083/actuator}
+          health-url: ${ADMIN_HEALTH_URL:http://billing:8083/actuator/health}
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5434/billing_db}
     username: ${DB_USERNAME:smartgn_billing}
@@ -22,7 +37,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info
 smartgn:
   internal-token: ${INTERNAL_SERVICE_TOKEN}
   support-url: ${SUPPORT_BASE_URL:}

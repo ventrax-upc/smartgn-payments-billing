@@ -165,6 +165,11 @@ public class OpenApiConfiguration {
                                                         operation
                                                                 .getResponses()
                                                                 .addApiResponse(status, success);
+                                                        if (path.startsWith("/api/v1/checkout/orders")) {
+                                                            operation.getResponses().putIfAbsent(
+                                                                    "400", new ApiResponse().description(
+                                                                            "Checkout inputs or required headers are missing or invalid."));
+                                                        }
                                                         if (!doc.security().isEmpty())
                                                             operation
                                                                     .getResponses()

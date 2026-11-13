@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option java_package = "com.ventrax.payments.grpc";
+option java_multiple_files = true;
+
+package smartgn.billing.v1;
+
+service SubscriptionEntitlementService {
+  rpc GetProEntitlement (ProEntitlementRequest) returns (ProEntitlementResponse);
+}
+
+message ProEntitlementRequest {
+  string account_id = 1;
+}
+
+message ProEntitlementResponse {
+  bool pro_active = 1;
+  string valid_until = 2;
+}

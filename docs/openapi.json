@@ -559,6 +559,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Checkout inputs or required headers are missing or invalid."
           }
         },
         "security": []
@@ -603,6 +606,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Checkout inputs or required headers are missing or invalid."
           }
         },
         "security": []
@@ -926,6 +932,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Checkout inputs or required headers are missing or invalid."
           }
         },
         "security": []
