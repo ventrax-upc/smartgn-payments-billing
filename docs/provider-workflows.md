@@ -21,3 +21,27 @@ See `docs/contracts.md` and runtime `/v3/api-docs` for public/private routes and
 Invoices, signed UBL XML, PDFs, daily summaries and CDR evidence are stored independently of payment state. Local mode produces clearly marked DEMO PDFs and LOCAL_ACCEPTED responses. `SUNAT_MODE=beta` selects the actual SUNAT beta SOAP adapter; test RUC/user/password from the official manual and a local signing certificate are used only for testing. Beta status is TEST_ACCEPTED/TEST_OBSERVED/TEST_REJECTED, never production acceptance. Missing issuer/key configuration retains PENDING_CONFIGURATION. Transport failure retains the exact summary and retries it without allocating another document number; SOAP rejection preserves its response for regularization.
 
 Production merchant/fiscal enablement, real certificates and customer fiscal requirements must be supplied before using this service with real transactions. No production integration is claimed by a local or beta result.
+
+## Niubiz Sandbox for initial checkout
+
+Billing supports a separate opt-in Niubiz Sandbox flow under the Spring
+`local` profile. Set `NIUBIZ_SANDBOX_ENABLED=true`,
+`NIUBIZ_SANDBOX_MERCHANT`, `NIUBIZ_SANDBOX_USER` and
+`NIUBIZ_SANDBOX_PASSWORD`. Billing uses `https://apisandbox.vnforappstest.com`
+for security, session and authorization. Security uses `GET /api.security/v1/security`.
+The sandbox is limited to initial PEN purchases.
+
+The checkout sessions route returns a session key for Niubiz's hosted card
+fields. POST the resulting transaction token to the order's
+`/sandbox-authorizations` route with the private checkout secret. Billing
+reserves a unique purchase number, checks the provider response against the
+order amount and currency, and records approved payments through the usual
+onboarding and fiscal outbox. Card numbers and CVVs stay in Niubiz's fields.
+One authorization is allowed per attempt. A declined order can start a new
+session with a fresh purchase number and token. An uncertain result requires
+reconciliation before another purchase. This does not enable Niubiz
+production, tokenization for saved cards, or recurring billing.
+
+### Browser checkout in the local profile
+
+When `LOCAL_BROWSER_CHECKOUT_ENABLED=true` and Niubiz Sandbox is disabled, the local checkout session advertises a simulator action. It requires the order's checkout secret. Billing derives the reference and amount from its own order, records the simulator result and runs the existing provider verification and onboarding flow. The browser supplies no amount, payment result or payment-provider credentials. Without the flag the protected fixture workflow remains available in the local profile.

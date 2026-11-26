@@ -573,7 +573,7 @@
           "Checkout"
         ],
         "summary": "Create checkout session instructions",
-        "description": "Requires the private checkout secret. Local instructions are an explicit test adapter, not a productive Niubiz hosted checkout. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
+        "description": "Requires the private checkout secret. In local mode, returns either simulated checkout instructions or a Niubiz Sandbox session when enabled.",
         "operationId": "session",
         "parameters": [
           {
@@ -1095,6 +1095,63 @@
           }
         ]
       }
+    },
+    "/api/v1/checkout/orders/{id}/sandbox-authorizations": {
+      "post": {
+        "tags": [
+          "Checkout"
+        ],
+        "summary": "Authorize a local test checkout",
+        "description": "Requires the private checkout secret. Billing verifies the Niubiz Sandbox token or processes the explicitly enabled local simulator action against the stored order.",
+        "operationId": "authorize",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource UUID. Possession of an identifier does not replace authorization.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Checkout-Secret",
+            "in": "header",
+            "description": "Private caller-generated checkout secret. Keep it confidential; an order UUID alone does not authorize access.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Authorization"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Operation completed successfully.",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Checkout inputs or required headers are missing or invalid."
+          }
+        },
+        "security": []
+      }
     }
   },
   "components": {
@@ -1304,6 +1361,19 @@
             "type": "boolean"
           }
         }
+      },
+      "Authorization": {
+        "type": "object",
+        "properties": {
+          "transactionToken": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "[A-Za-z0-9_-]{16,200}"
+          }
+        },
+        "required": [
+          "transactionToken"
+        ]
       }
     },
     "securitySchemes": {

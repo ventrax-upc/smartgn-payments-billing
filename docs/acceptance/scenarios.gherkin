@@ -1,0 +1,56 @@
+# Source: Ventrax AV4 report. Acceptance specification; execution is verified separately.
+Feature: Initial purchases, subscriptions and technical billing
+
+  Scenario: Confirm an initial purchase
+    Given an initial purchase order exists and payment has not been verified
+    When Billing receives and validates a successful payment confirmation
+    Then Billing records the verified purchase and makes the confirmation available for account provisioning
+
+  Scenario: Reject an invalid payment confirmation
+    Given a purchase order exists
+    When an invalid or unverifiable payment confirmation is received
+    Then Billing does not mark the purchase as paid
+
+  Scenario: Prevent duplicate payment processing
+    Given a payment transaction has already been recorded
+    When the same provider confirmation is received again
+    Then Billing does not create a duplicate transaction or repeat the resulting business action
+
+  Scenario: Store only tokenized payment information
+    Given the principal user authorizes a payment method through Niubiz
+    When Billing records the payment method
+    Then Billing stores only the permitted token and masked card information
+    And Billing does not store PAN or CVV
+
+  Scenario: Activate Pro after verified payment
+    Given the principal user has Free and requests Pro
+    When Billing verifies the subscription payment
+    Then Billing activates Pro and records its paid validity period
+
+  Scenario: Preserve Pro until the paid period ends
+    Given a user has an active paid Pro period
+    When a recurring payment attempt fails
+    Then Billing preserves the current Pro benefits until the paid period ends
+    And Billing does not extend the subscription without verified payment
+
+  Scenario: Apply full Pro coverage at visit completion
+    Given a technical visit has been completed
+    And the principal user's Pro subscription was active at the completion timestamp
+    When Billing evaluates the technical service coverage
+    Then Billing records full coverage for the applicable service cost
+
+  Scenario: Charge a Free technical visit after completion
+    Given a technical visit has been completed
+    And no applicable Pro coverage exists at its completion timestamp
+    When Billing determines the pending technical charge
+    Then Billing creates the corresponding payable amount without duplicating previous charges
+
+  Scenario: Restrict financial operations to the principal user
+    Given an authenticated subuser has delegated meter permissions
+    When the subuser attempts to manage cards, payments or subscriptions
+    Then Billing denies the operation
+
+  Scenario: Register the result of electronic invoicing
+    Given a transaction requires an electronic tax document
+    When the corresponding document is generated and processed
+    Then Billing records its identifier, status and applicable tax authority response

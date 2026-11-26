@@ -36,7 +36,16 @@
       "path": "/api/v1/checkout/orders/{id}/sessions",
       "tag": "Checkout",
       "summary": "Create checkout session instructions",
-      "description": "Requires the private checkout secret. Local instructions are an explicit test adapter, not a productive Niubiz hosted checkout. Authentication: no user JWT required; the operation-specific token or checkout secret still applies when specified.",
+      "description": "Requires the private checkout secret. In local mode, returns either simulated checkout instructions or a Niubiz Sandbox session when enabled.",
+      "success": 200,
+      "security": ""
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/checkout/orders/{id}/sandbox-authorizations",
+      "tag": "Checkout",
+      "summary": "Authorize a local test checkout",
+      "description": "Requires the private checkout secret. Billing verifies the Niubiz Sandbox token or processes the explicitly enabled local simulator action against the stored order.",
       "success": 200,
       "security": ""
     },
