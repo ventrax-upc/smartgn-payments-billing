@@ -6,7 +6,8 @@ Runtime `/v3/api-docs` and exported `openapi.json` define payload validation and
 | --- | --- | --- |
 | POST | /api/v1/checkout/orders | Server-priced initial purchase; Idempotency-Key and X-Checkout-Secret; validates provisional Installation contact |
 | GET | /api/v1/checkout/orders/{id} | Secret-protected initial-order status, without private contact/token fields |
-| POST | /api/v1/checkout/orders/{id}/sessions | Explicit local checkout instructions; never a claimed Niubiz hosted session |
+| POST | /api/v1/checkout/orders/{id}/sessions | Returns simulator instructions or, when enabled in local mode, a Niubiz Sandbox session |
+| POST | /api/v1/checkout/orders/{id}/sandbox-authorizations | Verifies the sandbox token or processes the explicitly enabled local simulator action against the stored order using the checkout secret |
 | POST/GET | /api/v1/payment-methods | Verify provider token ownership, store encrypted token and masked metadata; list only owner's masked methods |
 | PUT | /api/v1/payment-methods/{id}/default | Atomically select an owned active method |
 | DELETE | /api/v1/payment-methods/{id} | Unlink owned method and disable dependent auto-renew; unresolved debits must be reconciled first |

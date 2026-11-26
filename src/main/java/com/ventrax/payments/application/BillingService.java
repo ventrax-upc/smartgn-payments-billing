@@ -287,7 +287,27 @@ public class BillingService {
         if ("PRO".equals(initial.get("reason"))) lock(initial.get("account_id").toString());
         lock(id.toString());
         var o = order(id);
+        if (Boolean.TRUE.equals(db.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM niubiz_sandbox_checkouts WHERE order_id=?)", Boolean.class, id))) {
+            throw error(HttpStatus.CONFLICT, "This order uses Niubiz sandbox");
+        }
         var result = gateway.verify(reference, id, (BigDecimal) o.get("amount"));
+        return recordResult(id, reference, o, result);
+    }
+
+    @Transactional
+    public Map<String, Object> confirmSandbox(UUID id, PaymentGateway.Result result) {
+        lock(id.toString());
+        var o = order(id);
+        if (!result.testMode() || !"INITIAL".equals(o.get("reason"))
+                || result.amount().compareTo((BigDecimal) o.get("amount")) != 0) {
+            throw error(HttpStatus.CONFLICT, "Invalid sandbox checkout result");
+        }
+        return recordResult(id, result.reference(), o, result);
+    }
+
+    private Map<String, Object> recordResult(UUID id, String reference, Map<String, Object> o,
+            PaymentGateway.Result result) {
         var existing =
                 db.queryForList(
                         "SELECT * FROM payment_transactions WHERE provider_reference=?", reference);

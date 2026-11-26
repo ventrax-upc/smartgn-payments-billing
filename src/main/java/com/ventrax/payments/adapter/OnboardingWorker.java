@@ -12,13 +12,16 @@ import java.util.*;
 public class OnboardingWorker {
     private final JdbcTemplate db;
     private final RestClient iam, installation;
+    private final boolean waitForReceipt;
 
     public OnboardingWorker(
             JdbcTemplate db,
             @Value("${smartgn.iam-url}") String iamUrl,
             @Value("${smartgn.installation-url}") String instUrl,
-            @Value("${smartgn.internal-token}") String token) {
+            @Value("${smartgn.internal-token}") String token,
+            @Value("${smartgn.tax.mode:disabled}") String taxMode) {
         this.db = db;
+        this.waitForReceipt = !"disabled".equalsIgnoreCase(taxMode);
         var f =
                 new org.springframework.http.client.JdkClientHttpRequestFactory(
                         java.net.http.HttpClient.newBuilder()
@@ -44,16 +47,19 @@ public class OnboardingWorker {
                             + " id=(SELECT x.id FROM outbox x JOIN payment_orders o ON"
                             + " o.id=x.aggregate_id WHERE x.event_type='PaymentConfirmed' AND"
                             + " o.reason='INITIAL' AND x.delivered_at IS NULL AND"
+                            + " (NOT ? OR o.account_id IS NOT NULL OR EXISTS (SELECT 1 FROM"
+                            + " billing_documents d WHERE d.order_id=o.id AND d.pdf IS NOT NULL)) AND"
                             + " x.available_at<=now() AND (x.lease_until IS NULL OR"
                             + " x.lease_until<now()) ORDER BY x.created_at LIMIT 1 FOR UPDATE OF x"
                             + " SKIP LOCKED) RETURNING id",
-                        claim);
+                        claim, waitForReceipt);
         var jobs = new java.util.ArrayList<java.util.Map<String, Object>>();
         for (var c : claimed)
             jobs.addAll(
                     db.queryForList(
-                            "SELECT x.id AS event_id,x.correlation_id,o.* FROM outbox x JOIN"
-                                    + " payment_orders o ON o.id=x.aggregate_id WHERE x.id=?",
+                            "SELECT x.id AS event_id,x.correlation_id,o.*,d.pdf AS receipt_pdf FROM"
+                                    + " outbox x JOIN payment_orders o ON o.id=x.aggregate_id LEFT JOIN"
+                                    + " billing_documents d ON d.order_id=o.id WHERE x.id=?",
                             c.get("id")));
         for (var j : jobs)
             try {
@@ -78,7 +84,11 @@ public class OnboardingWorker {
                                                     "lastName",
                                                     j.get("last_name"),
                                                     "confirmed",
-                                                    true))
+                                                    true,
+                                                    "receiptPdf",
+                                                    j.get("receipt_pdf") instanceof byte[] pdf
+                                                            ? Base64.getEncoder().encodeToString(pdf)
+                                                            : ""))
                                     .retrieve()
                                     .body(Map.class);
                     account = UUID.fromString(result.get("accountId").toString());

@@ -122,7 +122,7 @@ class DatabaseTest {
     @Test
     void migrationCreatesIndependentSchema() {
         assertEquals(
-                4,
+                6,
                 db.queryForObject(
                         "SELECT count(*) FROM billing.flyway_schema_history WHERE success AND"
                                 + " version IS NOT NULL",
